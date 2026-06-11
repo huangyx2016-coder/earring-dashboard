@@ -53,7 +53,6 @@ td:first-child {{ text-align:left; font-weight:500; }}
 </style>
 </head>
 <body>
-<div class="nav"><a href="index.html">← 返回销售仪表盘</a></div>
 <div class="header"><h1>领星ERP 仪表盘</h1><p id="dateRange"></p></div>
 <div class="summary-bar" id="smLx"></div>
 
