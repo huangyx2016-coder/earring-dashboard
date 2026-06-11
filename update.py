@@ -151,12 +151,24 @@ orders_data = dict(sorted(od.items(), key=lambda x: x[1]['total'], reverse=True)
 print(f"    {len(orders_data)} stores, total={sum(d['total'] for d in orders_data.values())}")
 
 # ============================================================
+# DATA SOURCE 3: Lingxing ERP (from local lingxing_data.json)
+# ============================================================
+lingxing_data = None
+try:
+    with open("lingxing_data.json", "r", encoding="utf-8") as f:
+        lingxing_data = json.load(f)
+    print(f"  Lingxing: {lingxing_data.get('total_orders',0)} orders, {lingxing_data.get('shops_count',0)} stores, FBA {lingxing_data['stock_summary']['available']} available")
+except Exception as e:
+    print(f"  Lingxing: skipped ({e})")
+
+# ============================================================
 # BUILD HTML
 # ============================================================
 ed_json = json.dumps(earring_data, ensure_ascii=False)
 od_json = json.dumps(orders_data, ensure_ascii=False)
 de_json = json.dumps(dates_earring, ensure_ascii=False)
 do_json = json.dumps(dates_orders, ensure_ascii=False)
+lx_json = json.dumps(lingxing_data, ensure_ascii=False) if lingxing_data else "null"
 enames = list(earring_data.keys())
 s1 = enames[0] if enames else "耳环"
 s2 = enames[1] if len(enames) > 1 else ""
@@ -205,6 +217,7 @@ td:first-child {{ text-align:left; font-weight:500; }}
 <div class="tabs">
   <div class="tab active" onclick="switchTab('earring')">{s1}销售</div>
   <div class="tab" onclick="switchTab('orders')">每日下单统计</div>
+  <div class="tab" onclick="switchTab('lingxing')">领星ERP</div>
 </div>
 
 <!-- TAB 1: Earring -->
@@ -235,6 +248,24 @@ td:first-child {{ text-align:left; font-weight:500; }}
 </div>
 
 <div class="updated">更新于: <span id="updTime"></span></div>
+
+<!-- TAB 3: Lingxing ERP -->
+<div class="tab-content" id="tab-lingxing">
+  <div class="summary-bar" id="smLx"></div>
+  <div class="grid">
+    <div class="card"><h2>每日订单趋势</h2><div class="chart-wrap"><canvas id="lxLine"></canvas></div></div>
+    <div class="card"><h2>订单状态分布</h2><div class="chart-wrap"><canvas id="lxPie"></canvas></div></div>
+    <div class="card"><h2>Top 15 店铺 (按订单数)</h2><div class="chart-wrap" style="height:400px"><canvas id="lxBar"></canvas></div></div>
+    <div class="card"><h2>Top 15 店铺 (按金额)</h2><div class="chart-wrap" style="height:400px"><canvas id="lxBarAmt"></canvas></div></div>
+  </div>
+  <div class="grid">
+    <div class="card full-width"><h2>FBA库存概览 - Top 30 SKU</h2><div class="table-wrap" id="tLxStock"></div></div>
+  </div>
+  <div class="grid">
+    <div class="card full-width"><h2>订单店铺明细 (Top 50)</h2><div class="table-wrap" id="tLxOrders"></div></div>
+  </div>
+</div>
+
 <script>
 var EAR = {ed_json};
 var ORD = {od_json};
@@ -350,6 +381,94 @@ var colors = ['#4472C4','#ED7D31','#70AD47','#FFC000','#5B9BD5','#A5A5A5','#FF6B
   h+='<td class=\"num\">'+tO+'</td></tr></tbody></table>';
   document.getElementById('tOrders').innerHTML=h;
 }})();
+
+// ===== LINGXING ERP =====
+var LX = {lx_json};
+if (LX) {{
+  document.getElementById('smLx').innerHTML =
+    '<div class="summary-item"><div class="value">'+LX.total_orders.toLocaleString()+'</div><div class="label">总订单 ('+LX.shops_count+'店铺)</div></div>'+
+    '<div class="summary-item"><div class="value">$'+LX.total_amount.toLocaleString()+'</div><div class="label">订单总额</div></div>'+
+    '<div class="summary-item"><div class="value">'+LX.stock_summary.available.toLocaleString()+'</div><div class="label">FBA可售库存</div></div>'+
+    '<div class="summary-item"><div class="value">'+LX.stock_summary.unsellable.toLocaleString()+'</div><div class="label">FBA不可售</div></div>'+
+    '<div class="summary-item"><div class="value">'+LX.stock_summary.inbound.toLocaleString()+'</div><div class="label">在途</div></div>';
+
+  // Daily order line chart
+  if(typeof Chart!=='undefined' && LX.dates.length){{
+    var dailyOrders = LX.dates.map(function(d, i){{
+      var total = 0;
+      Object.values(LX.orders).forEach(function(s){{ total += (s.daily[d]||0); }});
+      return total;
+    }});
+    new Chart(document.getElementById('lxLine'),{{type:'line',
+      data:{{labels:LX.dates, datasets:[{{data:dailyOrders, borderColor:'#4472C4', backgroundColor:'rgba(68,114,196,0.1)', fill:true, tension:0.3, pointRadius:5, pointBackgroundColor:'#4472C4'}}]}},
+      options:{{responsive:true, maintainAspectRatio:false,
+        plugins:{{legend:{{display:false}}, tooltip:{{callbacks:{{label:function(c){{return c.raw+' 单'}}}}}}}},
+        scales:{{y:{{beginAtZero:true, grid:{{display:true}}}}}}}}}});
+  }}
+
+  // Order status doughnut
+  if(typeof Chart!=='undefined' && LX.status){{
+    var sc = LX.status;
+    var slabels = Object.keys(sc), sdata = Object.values(sc);
+    var scols = ['#4472C4','#70AD47','#ED7D31','#FFC000','#A5A5A5'];
+    new Chart(document.getElementById('lxPie'),{{type:'doughnut',
+      data:{{labels:slabels, datasets:[{{data:sdata, backgroundColor:scols.slice(0,slabels.length)}}]}},
+      options:{{responsive:true, maintainAspectRatio:false, plugins:{{legend:{{position:'right', labels:{{font:{{size:10}}, padding:6}}}}}}}}}});
+  }}
+
+  // Top 15 stores by orders
+  if(typeof Chart!=='undefined'){{
+    var topO = Object.entries(LX.orders).sort(function(a,b){{return b[1].total-a[1].total;}}).slice(0,15);
+    new Chart(document.getElementById('lxBar'),{{type:'bar',
+      data:{{labels:topO.map(function(x){{return x[0].length>18?x[0].slice(0,17)+'...':x[0];}}),
+            datasets:[{{data:topO.map(function(x){{return x[1].total;}}), backgroundColor:colors[0], borderRadius:3}}]}},
+      options:{{responsive:true, maintainAspectRatio:false, indexAxis:'y', plugins:{{legend:{{display:false}}}}, scales:{{x:{{grid:{{display:true}}}}}}}}}});
+  }}
+
+  // Top 15 stores by amount
+  if(typeof Chart!=='undefined'){{
+    var topA = Object.entries(LX.orders).sort(function(a,b){{return b[1].total_amount-a[1].total_amount;}}).slice(0,15);
+    new Chart(document.getElementById('lxBarAmt'),{{type:'bar',
+      data:{{labels:topA.map(function(x){{return x[0].length>18?x[0].slice(0,17)+'...':x[0];}}),
+            datasets:[{{data:topA.map(function(x){{return x[1].total_amount;}}), backgroundColor:'#ED7D31', borderRadius:3}}]}},
+      options:{{responsive:true, maintainAspectRatio:false, indexAxis:'y', plugins:{{legend:{{display:false}}, tooltip:{{callbacks:{{label:function(c){{return '$'+c.raw.toLocaleString();}}}}}}}}, scales:{{x:{{grid:{{display:true}}}}}}}}}});
+  }}
+
+  // FBA stock table
+  (function(){{
+    var h = '<table><thead><tr><th>SKU</th><th>品名</th><th>ASIN</th><th>可售</th><th>待发货</th><th>在途</th><th>不可售</th></tr></thead><tbody>';
+    LX.top_skus.slice(0,30).forEach(function(s){{
+      h += '<tr><td>'+s.sku+'</td><td>'+s.name+'</td><td>'+s.asin+'</td><td class="num">'+s.available.toLocaleString()+'</td><td class="num">'+s.pending.toLocaleString()+'</td><td class="num">'+s.inbound.toLocaleString()+'</td><td class="num">'+s.unsellable.toLocaleString()+'</td></tr>';
+    }});
+    h += '</tbody></table>';
+    document.getElementById('tLxStock').innerHTML = h;
+  }})();
+
+  // Orders detail table (top 50 stores, daily breakdown)
+  (function(){{
+    var top50 = Object.entries(LX.orders).sort(function(a,b){{return b[1].total-a[1].total;}}).slice(0,50);
+    var h = '<table><thead><tr><th>店铺</th>';
+    LX.dates.forEach(function(d){{ h += '<th colspan="2">'+d+'</th>'; }});
+    h += '<th>合计</th><th>金额</th></tr><tr><th></th>';
+    LX.dates.forEach(function(d){{ h += '<th>单量</th><th>金额</th>'; }});
+    h += '<th></th><th></th></tr></thead><tbody>';
+    var tO=0, tA=0;
+    top50.forEach(function(x){{
+      h += '<tr><td>'+x[0]+'</td>';
+      LX.dates.forEach(function(d){{ h += '<td class="num">'+(x[1].daily[d]||0)+'</td><td class="num">$'+Math.round(x[1].amount[d]||0).toLocaleString()+'</td>'; }});
+      h += '<td class="num" style="font-weight:bold">'+x[1].total+'</td><td class="num" style="font-weight:bold">$'+Math.round(x[1].total_amount).toLocaleString()+'</td></tr>';
+      tO += x[1].total; tA += x[1].total_amount;
+    }});
+    h += '<tr class="total-row"><td>合计 ('+top50.length+'/'+LX.shops_count+'店铺)</td>';
+    LX.dates.forEach(function(d){{
+      var dt=0, da=0;
+      top50.forEach(function(x){{ dt+=(x[1].daily[d]||0); da+=(x[1].amount[d]||0); }});
+      h += '<td class="num">'+dt+'</td><td class="num">$'+Math.round(da).toLocaleString()+'</td>';
+    }});
+    h += '<td class="num">'+tO+'</td><td class="num">$'+Math.round(tA).toLocaleString()+'</td></tr></tbody></table>';
+    document.getElementById('tLxOrders').innerHTML = h;
+  }})();
+}}
 
 function switchTab(name){{
   document.querySelectorAll('.tab').forEach(function(t){{t.classList.remove('active');}});
