@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="refresh" content="3600">
+<title>耳环销售仪表盘</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Microsoft YaHei', sans-serif; background:#f0f2f5; color:#333; padding:16px; }
+.header { text-align:center; margin-bottom:16px; }
+.header h1 { font-size:20px; color:#1a1a2e; }
+.header p { color:#666; margin-top:2px; font-size:12px; }
+.grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+.card { background:#fff; border-radius:10px; padding:14px; box-shadow:0 2px 6px rgba(0,0,0,0.06); }
+.card h2 { font-size:14px; margin-bottom:8px; color:#1a1a2e; border-bottom:2px solid #4472C4; padding-bottom:5px; }
+.chart-wrap { position:relative; height:280px; }
+.table-wrap { max-height:420px; overflow-y:auto; }
+table { width:100%; border-collapse:collapse; font-size:11px; }
+th { background:#4472C4; color:#fff; padding:5px 3px; position:sticky; top:0; z-index:1; text-align:center; }
+td { padding:3px; text-align:center; border-bottom:1px solid #eee; }
+tr:hover td { background:#f5f7fa; }
+td:first-child { text-align:left; font-weight:500; }
+.num { text-align:right; }
+.total-row td { font-weight:bold; background:#FFF2CC; border-top:2px solid #4472C4; }
+.full-width { grid-column:1/-1; }
+.summary-bar { display:flex; gap:14px; margin-bottom:14px; }
+.summary-item { flex:1; background:#fff; border-radius:10px; padding:12px 14px; box-shadow:0 2px 6px rgba(0,0,0,0.06); text-align:center; }
+.summary-item .value { font-size:22px; font-weight:bold; color:#4472C4; }
+.summary-item .label { font-size:10px; color:#888; margin-top:1px; }
+.updated { text-align:right; color:#aaa; font-size:10px; margin-top:8px; }
+@media (max-width:768px) { .grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="header"><h1>耳环销售仪表盘</h1><p id="dateRange"></p></div>
+<div class="summary-bar" id="summaryBar"></div>
+<div class="grid">
+  <div class="card"><h2>耳环 - 销售占比</h2><div class="chart-wrap"><canvas id="pie1"></canvas></div></div>
+  <div class="card"><h2>耳环-新店 - 销售占比</h2><div class="chart-wrap"><canvas id="pie2"></canvas></div></div>
+  <div class="card"><h2>耳环 - Top 10</h2><div class="chart-wrap"><canvas id="bar1"></canvas></div></div>
+  <div class="card"><h2>耳环-新店 - Top 10</h2><div class="chart-wrap"><canvas id="bar2"></canvas></div></div>
+</div>
+<div class="grid">
+  <div class="card full-width"><h2>耳环 - 全部明细</h2><div class="table-wrap" id="t1"></div></div>
+  <div class="card full-width"><h2>耳环-新店 - 全部明细</h2><div class="table-wrap" id="t2"></div></div>
+</div>
+<div class="updated">更新于: <span id="updTime"></span></div>
+<script>
+var DATA = ["06/04", "06/05", "06/06", "06/07", "06/08", "06/09", "06/10"];
+var SHEETS = {"耳环": {"NEARLAND(pavoi)": {"daily": {"06/04": 31, "06/05": 22, "06/06": 16, "06/07": 32, "06/08": 26, "06/09": 19, "06/10": 23}, "total": 169}, "vuiikhir": {"daily": {"06/04": 17, "06/05": 11, "06/06": 17, "06/07": 14, "06/08": 10, "06/09": 13, "06/10": 16}, "total": 98}, "Degerde": {"daily": {"06/04": 17, "06/05": 12, "06/06": 6, "06/07": 26, "06/08": 13, "06/09": 13, "06/10": 9}, "total": 96}, "HOBATS": {"daily": {"06/04": 19, "06/05": 16, "06/06": 17, "06/07": 10, "06/08": 12, "06/09": 16, "06/10": 6}, "total": 96}, "KFERAXSZ": {"daily": {"06/04": 13, "06/05": 9, "06/06": 13, "06/07": 8, "06/08": 13, "06/09": 10, "06/10": 21}, "total": 87}, "ELEBEST": {"daily": {"06/04": 12, "06/05": 16, "06/06": 12, "06/07": 13, "06/08": 13, "06/09": 7, "06/10": 6}, "total": 79}, "Aidomiya": {"daily": {"06/04": 5, "06/05": 12, "06/06": 8, "06/07": 8, "06/08": 12, "06/09": 10, "06/10": 18}, "total": 73}, "AMELINE": {"daily": {"06/04": 8, "06/05": 7, "06/06": 9, "06/07": 12, "06/08": 10, "06/09": 14, "06/10": 8}, "total": 68}, "DZCYAN": {"daily": {"06/04": 5, "06/05": 12, "06/06": 10, "06/07": 11, "06/08": 3, "06/09": 19, "06/10": 5}, "total": 65}, "GLOSOLE": {"daily": {"06/04": 12, "06/05": 17, "06/06": 6, "06/07": 8, "06/08": 4, "06/09": 9, "06/10": 8}, "total": 64}, "Fureylenx": {"daily": {"06/04": 16, "06/05": 10, "06/06": 8, "06/07": 10, "06/08": 8, "06/09": 6, "06/10": 6}, "total": 64}, "Verniflloga": {"daily": {"06/04": 4, "06/05": 13, "06/06": 9, "06/07": 13, "06/08": 8, "06/09": 7, "06/10": 7}, "total": 61}, "Kelli Myers(pavoi)": {"daily": {"06/04": 7, "06/05": 15, "06/06": 8, "06/07": 9, "06/08": 6, "06/09": 8, "06/10": 6}, "total": 59}, "CHLOÉ LOVETT": {"daily": {"06/04": 8, "06/05": 5, "06/06": 6, "06/07": 8, "06/08": 9, "06/09": 6, "06/10": 10}, "total": 52}, "SANDRA REDD": {"daily": {"06/04": 6, "06/05": 6, "06/06": 10, "06/07": 6, "06/08": 3, "06/09": 12, "06/10": 7}, "total": 50}, "Kate": {"daily": {"06/04": 7, "06/05": 8, "06/06": 7, "06/07": 11, "06/08": 2, "06/09": 7, "06/10": 8}, "total": 50}, "BalaBelle": {"daily": {"06/04": 6, "06/05": 13, "06/06": 8, "06/07": 3, "06/08": 6, "06/09": 4, "06/10": 6}, "total": 46}, "GIORGIA GIBBS": {"daily": {"06/04": 6, "06/05": 5, "06/06": 9, "06/07": 6, "06/08": 9, "06/09": 4, "06/10": 4}, "total": 43}, "SPACMAG": {"daily": {"06/04": 13, "06/05": 5, "06/06": 9, "06/07": 1, "06/08": 4, "06/09": 6, "06/10": 5}, "total": 43}, "USESMTLE(pavoi)": {"daily": {"06/04": 8, "06/05": 6, "06/06": 6, "06/07": 2, "06/08": 6, "06/09": 6, "06/10": 9}, "total": 43}, "Fureoai": {"daily": {"06/04": 8, "06/05": 9, "06/06": 3, "06/07": 4, "06/08": 8, "06/09": 4, "06/10": 7}, "total": 43}, "ENROSE": {"daily": {"06/04": 6, "06/05": 6, "06/06": 8, "06/07": 5, "06/08": 8, "06/09": 7, "06/10": 2}, "total": 42}, "KATIE OTTE": {"daily": {"06/04": 2, "06/05": 8, "06/06": 7, "06/07": 8, "06/08": 4, "06/09": 4, "06/10": 8}, "total": 41}, "COSSA": {"daily": {"06/04": 5, "06/05": 2, "06/06": 5, "06/07": 9, "06/08": 7, "06/09": 5, "06/10": 7}, "total": 40}, "Chantel Yorke": {"daily": {"06/04": 8, "06/05": 7, "06/06": 1, "06/07": 9, "06/08": 6, "06/09": 5, "06/10": 2}, "total": 38}, "AIGAMIT": {"daily": {"06/04": 1, "06/05": 6, "06/06": 8, "06/07": 8, "06/08": 4, "06/09": 4, "06/10": 5}, "total": 36}, "JADE KOS": {"daily": {"06/04": 2, "06/05": 4, "06/06": 12, "06/07": 4, "06/08": 2, "06/09": 9, "06/10": 2}, "total": 35}, "Amoxos": {"daily": {"06/04": 5, "06/05": 5, "06/06": 9, "06/07": 1, "06/08": 1, "06/09": 10, "06/10": 3}, "total": 34}, "BANGALO": {"daily": {"06/04": 2, "06/05": 10, "06/06": 2, "06/07": 4, "06/08": 6, "06/09": 2, "06/10": 6}, "total": 32}, "Fanglcy": {"daily": {"06/04": 1, "06/05": 4, "06/06": 5, "06/07": 4, "06/08": 5, "06/09": 3, "06/10": 3}, "total": 25}, "varger": {"daily": {"06/04": 2, "06/05": 3, "06/06": 2, "06/07": 5, "06/08": 4, "06/09": 4, "06/10": 4}, "total": 24}, "LISHUIHAOMI": {"daily": {"06/04": 3, "06/05": 3, "06/06": 4, "06/07": 0, "06/08": 1, "06/09": 7, "06/10": 5}, "total": 23}, "TAKUGI": {"daily": {"06/04": 1, "06/05": 3, "06/06": 3, "06/07": 5, "06/08": 2, "06/09": 3, "06/10": 4}, "total": 21}, "GIULIA LEONI": {"daily": {"06/04": 3, "06/05": 3, "06/06": 4, "06/07": 4, "06/08": 2, "06/09": 0, "06/10": 2}, "total": 18}, "Eterbeau": {"daily": {"06/04": 4, "06/05": 3, "06/06": 1, "06/07": 0, "06/08": 5, "06/09": 0, "06/10": 4}, "total": 17}, "Selroper": {"daily": {"06/04": 3, "06/05": 1, "06/06": 2, "06/07": 1, "06/08": 0, "06/09": 0, "06/10": 0}, "total": 7}, "SPOINT": {"daily": {"06/04": 0, "06/05": 1, "06/06": 1, "06/07": 0, "06/08": 0, "06/09": 0, "06/10": 0}, "total": 2}}, "耳环-新店": {"YAUVC": {"daily": {"06/04": 11, "06/05": 9, "06/06": 8, "06/07": 9, "06/08": 5, "06/09": 7, "06/10": 4}, "total": 53}, "SREEOWER": {"daily": {"06/04": 10, "06/05": 3, "06/06": 12, "06/07": 5, "06/08": 5, "06/09": 5, "06/10": 2}, "total": 42}, "Lamdesa": {"daily": {"06/04": 7, "06/05": 7, "06/06": 9, "06/07": 9, "06/08": 1, "06/09": 4, "06/10": 3}, "total": 40}, "Charmire": {"daily": {"06/04": 3, "06/05": 4, "06/06": 3, "06/07": 5, "06/08": 6, "06/09": 4, "06/10": 9}, "total": 34}, "Eloqueen": {"daily": {"06/04": 5, "06/05": 3, "06/06": 5, "06/07": 4, "06/08": 1, "06/09": 9, "06/10": 3}, "total": 30}, "iewrsox": {"daily": {"06/04": 3, "06/05": 3, "06/06": 3, "06/07": 4, "06/08": 2, "06/09": 5, "06/10": 2}, "total": 22}, "BEAUSPA": {"daily": {"06/04": 3, "06/05": 2, "06/06": 3, "06/07": 4, "06/08": 2, "06/09": 5, "06/10": 3}, "total": 22}, "KKR": {"daily": {"06/04": 5, "06/05": 2, "06/06": 3, "06/07": 3, "06/08": 1, "06/09": 3, "06/10": 2}, "total": 19}, "PWQIEE": {"daily": {"06/04": 2, "06/05": 3, "06/06": 4, "06/07": 3, "06/08": 3, "06/09": 0, "06/10": 4}, "total": 19}, "ESSIE ODILA": {"daily": {"06/04": 1, "06/05": 3, "06/06": 4, "06/07": 1, "06/08": 1, "06/09": 6, "06/10": 1}, "total": 17}, "Sincere-ljh": {"daily": {"06/04": 2, "06/05": 2, "06/06": 4, "06/07": 2, "06/08": 1, "06/09": 2, "06/10": 4}, "total": 17}, "worfey": {"daily": {"06/04": 2, "06/05": 1, "06/06": 2, "06/07": 5, "06/08": 2, "06/09": 1, "06/10": 2}, "total": 15}, "UUBUUCD": {"daily": {"06/04": 2, "06/05": 1, "06/06": 4, "06/07": 4, "06/08": 0, "06/09": 1, "06/10": 3}, "total": 15}, "Maodeso": {"daily": {"06/04": 1, "06/05": 2, "06/06": 3, "06/07": 1, "06/08": 1, "06/09": 1, "06/10": 5}, "total": 14}, "Lageza": {"daily": {"06/04": 2, "06/05": 4, "06/06": 1, "06/07": 1, "06/08": 1, "06/09": 1, "06/10": 2}, "total": 12}, "Yiidcii": {"daily": {"06/04": 0, "06/05": 2, "06/06": 1, "06/07": 2, "06/08": 2, "06/09": 0, "06/10": 2}, "total": 9}, "YFdeSi": {"daily": {"06/04": 1, "06/05": 2, "06/06": 1, "06/07": 2, "06/08": 2, "06/09": 0, "06/10": 0}, "total": 8}, "TECYOW": {"daily": {"06/04": 0, "06/05": 1, "06/06": 4, "06/07": 1, "06/08": 1, "06/09": 0, "06/10": 1}, "total": 8}, "nuoxun": {"daily": {"06/04": 0, "06/05": 0, "06/06": 0, "06/07": 2, "06/08": 0, "06/09": 1, "06/10": 2}, "total": 5}, "Cendyess": {"daily": {"06/04": 2, "06/05": 1, "06/06": 0, "06/07": 0, "06/08": 1, "06/09": 0, "06/10": 0}, "total": 4}, "Raysam": {"daily": {"06/04": 1, "06/05": 0, "06/06": 0, "06/07": 1, "06/08": 1, "06/09": 1, "06/10": 0}, "total": 4}, "Aolumio": {"daily": {"06/04": 0, "06/05": 0, "06/06": 1, "06/07": 0, "06/08": 0, "06/09": 1, "06/10": 1}, "total": 3}, "gotoeewigs": {"daily": {"06/04": 0, "06/05": 1, "06/06": 0, "06/07": 0, "06/08": 1, "06/09": 0, "06/10": 0}, "total": 2}, "JOZZFEE": {"daily": {"06/04": 0, "06/05": 0, "06/06": 1, "06/07": 0, "06/08": 0, "06/09": 0, "06/10": 0}, "total": 1}}};
+var S1 = '耳环';
+var S2 = '耳环-新店';
+var UPD = '2026-06-11 12:14';
+
+document.getElementById('dateRange').textContent = DATA[0] + ' — ' + DATA[DATA.length-1] + '（'+DATA.length+'天）';
+document.getElementById('updTime').textContent = UPD;
+
+var colors = ['#4472C4','#ED7D31','#70AD47','#FFC000','#5B9BD5','#A5A5A5','#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#98D8C8'];
+
+(function(){
+  var dates = DATA;
+  var s1 = SHEETS[S1] || {};
+  var s2 = SHEETS[S2] || {};
+
+  function st(s) { var e=Object.entries(s); return {cnt:e.length, total:e.reduce(function(a,x){return a+x[1].total},0)}; }
+  var r1=st(s1), r2=st(s2);
+  document.getElementById('summaryBar').innerHTML =
+    '<div class="summary-item"><div class="value">'+r1.total.toLocaleString()+'</div><div class="label">'+S1+' ('+r1.cnt+'店铺)</div></div>'+
+    '<div class="summary-item"><div class="value">'+r2.total.toLocaleString()+'</div><div class="label">'+S2+' ('+r2.cnt+'店铺)</div></div>'+
+    '<div class="summary-item"><div class="value">'+(r1.total+r2.total).toLocaleString()+'</div><div class="label">合计</div></div>';
+
+  function mkTbl(divId, sd) {
+    var e = Object.entries(sd).sort(function(a,b){return b[1].total-a[1].total});
+    var total = e.reduce(function(s,x){return s+x[1].total},0);
+    var h='<table><thead><tr><th>店铺</th>';
+    dates.forEach(function(d){h+='<th>'+d+'</th>';});
+    h+='<th>合计</th></tr></thead><tbody>';
+    e.forEach(function(x){
+      var name=x[0], d=x[1];
+      h+='<tr><td>'+name+'</td>';
+      dates.forEach(function(dd){h+='<td class="num">'+(d.daily[dd]||0)+'</td>';});
+      h+='<td class="num" style="font-weight:bold">'+d.total+'</td></tr>';
+    });
+    h+='<tr class="total-row"><td>合计</td>';
+    dates.forEach(function(dd){var dt=e.reduce(function(s,x){return s+(x[1].daily[dd]||0)},0);h+='<td class="num">'+dt+'</td>';});
+    h+='<td class="num">'+total+'</td></tr></tbody></table>';
+    document.getElementById(divId).innerHTML=h;
+  }
+
+  function mkPie(id, sd) {
+    var e = Object.entries(sd).sort(function(a,b){return b[1].total-a[1].total});
+    var labels, dt;
+    if(e.length<=8){labels=e.map(function(x){return x[0]});dt=e.map(function(x){return x[1].total});}
+    else{labels=e.slice(0,8).map(function(x){return x[0]}).concat(['其他']);
+         dt=e.slice(0,8).map(function(x){return x[1].total}).concat([e.slice(8).reduce(function(s,x){return s+x[1].total},0)]);}
+    new Chart(document.getElementById(id),{type:'doughnut',
+      data:{labels:labels,datasets:[{data:dt,backgroundColor:colors.slice(0,labels.length)}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:10},padding:6}}}}});
+  }
+
+  function mkBar(id, sd) {
+    var top = Object.entries(sd).sort(function(a,b){return b[1].total-a[1].total}).slice(0,10);
+    new Chart(document.getElementById(id),{type:'bar',
+      data:{labels:top.map(function(x){return x[0].length>14?x[0].slice(0,13)+'…':x[0]}),
+            datasets:[{data:top.map(function(x){return x[1].total}),backgroundColor:colors[0],borderRadius:3}]},
+      options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{display:true}}}}});
+  }
+
+  if(Object.keys(s1).length){mkTbl('t1',s1);if(typeof Chart!=='undefined'){mkPie('pie1',s1);mkBar('bar1',s1);}}
+  if(Object.keys(s2).length){mkTbl('t2',s2);if(typeof Chart!=='undefined'){mkPie('pie2',s2);mkBar('bar2',s2);}}
+})();
+</script>
+</body>
+</html>
