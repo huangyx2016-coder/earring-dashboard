@@ -252,6 +252,7 @@ td:first-child {{ text-align:left; font-weight:500; }}
 <!-- TAB 3: Lingxing ERP -->
 <div class="tab-content" id="tab-lingxing">
   <div class="summary-bar" id="smLx"></div>
+  <div style="text-align:right;margin-bottom:8px"><a href="lingxing.html" target="_blank" style="color:#4472C4;text-decoration:none;font-size:12px">在新标签页打开 →</a></div>
   <div class="grid">
     <div class="card"><h2>每日订单趋势</h2><div class="chart-wrap"><canvas id="lxLine"></canvas></div></div>
     <div class="card"><h2>订单状态分布</h2><div class="chart-wrap"><canvas id="lxPie"></canvas></div></div>
