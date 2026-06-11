@@ -99,9 +99,18 @@ def _int(v) -> int:
 
 
 if __name__ == "__main__":
-    import sys
-    path = sys.argv[1] if len(sys.argv) > 1 else "C:/Users/Admin/lingxing-api/lingxing_20260611_163012.json"
-    result = process(path)
-    print(json.dumps({k: v for k, v in result.items() if k not in ("orders", "warehouse_stock")}, ensure_ascii=False, indent=2))
-    print(f"\nTop stores: {list(result['orders'].keys())[:10]}")
-    print(f"Top warehouses: {list(result['warehouse_stock'].keys())[:5]}")
+    import sys, argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("input", nargs="?", default="C:/Users/Admin/lingxing-api/lingxing_20260611_163012.json")
+    parser.add_argument("-o", "--output", default=None, help="直接写入 JSON 文件")
+    args = parser.parse_args()
+
+    result = process(args.input)
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False)
+        print(f"Saved to {args.output}")
+    else:
+        summary = {k: v for k, v in result.items() if k not in ("orders", "warehouse_stock")}
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+    print(f"\n{result['total_orders']} orders, {result['shops_count']} stores, {result['stock_summary']['available']} FBA available")
