@@ -135,9 +135,10 @@ for s in range(1, 197, 50):
             total = 0
             for di in range(min(DAYS, len(dates_orders))):
                 b = di * 4
-                us = int(row[b]) if b < len(row) and isinstance(row[b],(int,float)) else 0
-                eu = int(row[b+1]) if b+1 < len(row) and isinstance(row[b+1],(int,float)) else 0
-                ca = int(row[b+2]) if b+2 < len(row) and isinstance(row[b+2],(int,float)) else 0
+                # Column order within each 4-col group: CA, SUM, US, EU
+                ca = int(row[b]) if b < len(row) and isinstance(row[b],(int,float)) else 0
+                us = int(row[b+2]) if b+2 < len(row) and isinstance(row[b+2],(int,float)) else 0
+                eu = int(row[b+3]) if b+3 < len(row) and isinstance(row[b+3],(int,float)) else 0
                 d = dates_orders[di]
                 od[name]['daily_us'][d] = us; od[name]['daily_eu'][d] = eu; od[name]['daily_ca'][d] = ca
                 total += us + eu + ca
