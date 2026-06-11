@@ -17,10 +17,9 @@ jobs:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
         run: python update.py
-      - run: python build_lingxing.py
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add index.html lingxing.html
+          git add index.html
           git diff --staged --quiet || git commit -m "Auto update $(date +%Y-%m-%d)"
           git push
