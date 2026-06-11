@@ -103,10 +103,12 @@ for base in range(3305, 2000, -30):
     except: continue
 
 if end_col2 is None: end_col2 = 1206
-sc2 = end_col2 - DAYS * 4 + 1
-print(f"  Orders: cols {sc2}-{end_col2}")
+# Align start to group boundary: each group = US,EU,CA,SUM (serial at US=col 0)
+# Groups are 4 cols apart. Serial at end_col is US. Go back (DAYS-1)*4 for start.
+sc2 = end_col2 - (DAYS - 1) * 4
+print(f"  Orders: cols {sc2}-{end_col2+3}")
 
-v = api_get(f"https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{ST2}/values/{SID2}!{cl(sc2)}1:{cl(end_col2)}1", token)
+v = api_get(f"https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{ST2}/values/{SID2}!{cl(sc2)}1:{cl(end_col2+3)}1", token)
 r1 = v['data']['valueRange']['values'][0]
 dates_orders = []
 for val in r1:
@@ -124,7 +126,7 @@ od = defaultdict(lambda: {'daily_us': {d:0 for d in dates_orders}, 'daily_eu': {
 for s in range(1, 197, 50):
     er = min(s+49, 196)
     try:
-        v = api_get(f"https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{ST2}/values/{SID2}!{cl(sc2)}{s}:{cl(end_col2)}{er}", token)
+        v = api_get(f"https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{ST2}/values/{SID2}!{cl(sc2)}{s}:{cl(end_col2+3)}{er}", token)
         rows = v['data']['valueRange']['values']
         for ri, row in enumerate(rows):
             ni = s + ri - 1
@@ -135,10 +137,10 @@ for s in range(1, 197, 50):
             total = 0
             for di in range(min(DAYS, len(dates_orders))):
                 b = di * 4
-                # Column order within each 4-col group: CA, SUM, US, EU
-                ca = int(row[b]) if b < len(row) and isinstance(row[b],(int,float)) else 0
-                us = int(row[b+2]) if b+2 < len(row) and isinstance(row[b+2],(int,float)) else 0
-                eu = int(row[b+3]) if b+3 < len(row) and isinstance(row[b+3],(int,float)) else 0
+                # Column order within each 4-col group: US, EU, CA, SUM
+                us = int(row[b]) if b < len(row) and isinstance(row[b],(int,float)) else 0
+                eu = int(row[b+1]) if b+1 < len(row) and isinstance(row[b+1],(int,float)) else 0
+                ca = int(row[b+2]) if b+2 < len(row) and isinstance(row[b+2],(int,float)) else 0
                 d = dates_orders[di]
                 od[name]['daily_us'][d] = us; od[name]['daily_eu'][d] = eu; od[name]['daily_ca'][d] = ca
                 total += us + eu + ca
