@@ -1,7 +1,7 @@
 name: Update Dashboard
 on:
   schedule:
-    - cron: '0 2 * * *'  # 10:00 UTC+8 = 02:00 UTC
+    - cron: '15 1,7 * * *'  # 9:15 & 15:15 UTC+8
   workflow_dispatch:  # allow manual trigger
 
 jobs:
