@@ -1,8 +1,8 @@
 name: Update Dashboard
 on:
-  schedule:
-    - cron: '15 1,7 * * *'  # 9:15 & 15:15 UTC+8
-  workflow_dispatch:  # allow manual trigger
+  # schedule:  # paused - only lingxing-dashboard is active
+  #   - cron: '15 1,7 * * *'
+  workflow_dispatch:  # manual trigger only
 
 jobs:
   update:
