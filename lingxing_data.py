@@ -81,10 +81,18 @@ def process(lingxing_json_path: str, days: int = 7):
     silver_kw = ['LIEBLICH','ESSIE','Annamate','CHICLOVE','Billie Bijoux','Van Chloe','ANNIS MUNN','ANNIS','AmorAime','BlingGem','NinaMaid','WISHMISS']
     def _is_silver(name):
         n = name.lower().replace(" ", "")
-        return any(k.lower().replace(" ", "") in n for k in silver_kw)
+        for k in silver_kw:
+            # Match whole keyword first, then individual parts (handles warehouse name typos)
+            if k.lower().replace(" ", "") in n:
+                return True
+            for part in k.lower().split():
+                if part in n:
+                    return True
+        return False
 
-    # Exclude silver from orders
+    # Exclude silver from orders + warehouse
     non_silver_orders = {k: v for k, v in orders_data.items() if not _is_silver(k)}
+    non_silver_warehouse = {k: v for k, v in warehouse_data.items() if not _is_silver(k)}
 
     # Recalculate totals without silver
     non_silver_total_orders = sum(v["total"] for v in non_silver_orders.values())
@@ -96,7 +104,7 @@ def process(lingxing_json_path: str, days: int = 7):
         "orders": non_silver_orders,
         "status": dict(status_counts),
         "stock_summary": stock_summary,
-        "warehouse_stock": warehouse_data,
+        "warehouse_stock": non_silver_warehouse,
         "top_skus": top_skus,
         "total_orders": non_silver_total_orders,
         "total_amount": round(non_silver_total_amount, 2),
