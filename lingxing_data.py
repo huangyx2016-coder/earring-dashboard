@@ -1,7 +1,7 @@
 """处理领星ERP JSON数据 → 仪表盘 JS 变量"""
 import json
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def process(lingxing_json_path: str, days: int = 7):
@@ -112,7 +112,7 @@ def _int(v) -> int:
 
 
 if __name__ == "__main__":
-    import sys, argparse
+    import sys, argparse, os
     parser = argparse.ArgumentParser()
     parser.add_argument("input", nargs="?", default="C:/Users/Admin/lingxing-api/lingxing_20260611_163012.json")
     parser.add_argument("-o", "--output", default=None, help="直接写入 JSON 文件")
@@ -123,6 +123,53 @@ if __name__ == "__main__":
         with open(args.output, "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False)
         print(f"Saved to {args.output}")
+
+        # Also generate silver-only data file
+        silver_kw = ['LIEBLICH','ESSIE','Annamate','CHICLOVE','Billie Bijoux','Van Chloe','ANNIS MUNN','ANNIS','AmorAime','BlingGem','NinaMaid','WISHMISS']
+        def _is_silver(name):
+            n = name.lower().replace(" ", "")
+            return any(k.lower().replace(" ", "") in n for k in silver_kw)
+
+        with open(args.input, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        orders = raw.get("orders", [])
+        shop_daily = {}
+        from collections import defaultdict
+        shop_daily = defaultdict(lambda: {"daily": defaultdict(int), "amount": defaultdict(float), "total": 0, "total_amount": 0.0})
+        dates_set = set()
+        for o in orders:
+            d = (o.get("purchase_date_local") or "")[:10]
+            if not d: continue
+            dates_set.add(d)
+            name = o.get("seller_name", "?")
+            if not _is_silver(name): continue
+            amt = float(o.get("order_total_amount", 0) or 0)
+            shop_daily[name]["daily"][d] += 1
+            shop_daily[name]["amount"][d] += amt
+            shop_daily[name]["total"] += 1
+            shop_daily[name]["total_amount"] += amt
+        dates = sorted(dates_set)[-7:]
+        fmt_dates = [datetime.strptime(d, "%Y-%m-%d").strftime("%m/%d") for d in dates]
+        silver_orders = {}
+        for name, d in sorted(shop_daily.items(), key=lambda x: x[1]["total"], reverse=True):
+            silver_orders[name] = {
+                "daily": {fmt_dates[i]: d["daily"].get(date, 0) for i, date in enumerate(dates)},
+                "amount": {fmt_dates[i]: round(d["amount"].get(date, 0), 2) for i, date in enumerate(dates)},
+                "total": d["total"],
+                "total_amount": round(d["total_amount"], 2),
+            }
+        silver_data = {
+            "pull_time": raw.get("pull_time", ""),
+            "dates": fmt_dates,
+            "orders": silver_orders,
+            "total_orders": sum(v["total"] for v in silver_orders.values()),
+            "shops_count": len(silver_orders),
+        }
+        silver_path = os.path.join(os.path.dirname(args.output), "silver_data.json")
+        with open(silver_path, "w", encoding="utf-8") as f:
+            json.dump(silver_data, f, ensure_ascii=False)
+        print(f"Silver data saved to {silver_path} ({silver_data['total_orders']} orders)")
+
     else:
         summary = {k: v for k, v in result.items() if k not in ("orders", "warehouse_stock")}
         print(json.dumps(summary, ensure_ascii=False, indent=2))
