@@ -166,10 +166,24 @@ if __name__ == "__main__":
                 "total": d["total"],
                 "total_amount": round(d["total_amount"], 2),
             }
+        # FBA stock for silver stores
+        stocks = raw.get("stocks", [])
+        sw = defaultdict(lambda: {"available": 0, "pending": 0, "inbound": 0, "unsellable": 0, "skus": 0})
+        for s in stocks:
+            w = s.get("wname") or s.get("name", "?")
+            if not _is_silver(w): continue
+            sw[w]["available"] += int(s.get("afn_fulfillable_quantity", 0) or 0)
+            sw[w]["pending"] += int(s.get("reserved_customerorders", 0) or 0)
+            sw[w]["inbound"] += int(s.get("afn_inbound_shipped_quantity", 0) or 0)
+            sw[w]["unsellable"] += int(s.get("afn_unsellable_quantity", 0) or 0)
+            sw[w]["skus"] += 1
+        silver_warehouse = dict(sorted(sw.items(), key=lambda x: x[1]["available"], reverse=True))
+
         silver_data = {
             "pull_time": raw.get("pull_time", ""),
             "dates": fmt_dates,
             "orders": silver_orders,
+            "warehouse_stock": silver_warehouse,
             "total_orders": sum(v["total"] for v in silver_orders.values()),
             "shops_count": len(silver_orders),
         }
