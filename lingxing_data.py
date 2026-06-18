@@ -77,17 +77,30 @@ def process(lingxing_json_path: str, days: int = 7):
             "unsellable": _int(s.get("afn_unsellable_quantity")),
         })
 
+    # Exclude silver stores (moved to standalone silver-dashboard)
+    silver_kw = ['LIEBLICH','ESSIE','Annamate','CHICLOVE','Billie Bijoux','Van Chloe','ANNIS MUNN','ANNIS','AmorAime','BlingGem','NinaMaid','WISHMISS']
+    def _is_silver(name):
+        n = name.lower().replace(" ", "")
+        return any(k.lower().replace(" ", "") in n for k in silver_kw)
+
+    # Exclude silver from orders
+    non_silver_orders = {k: v for k, v in orders_data.items() if not _is_silver(k)}
+
+    # Recalculate totals without silver
+    non_silver_total_orders = sum(v["total"] for v in non_silver_orders.values())
+    non_silver_total_amount = sum(v["total_amount"] for v in non_silver_orders.values())
+
     return {
         "dates": fmt_dates,
         "dates_raw": dates,
-        "orders": orders_data,
+        "orders": non_silver_orders,
         "status": dict(status_counts),
         "stock_summary": stock_summary,
         "warehouse_stock": warehouse_data,
         "top_skus": top_skus,
-        "total_orders": len(orders),
-        "total_amount": round(sum(float(o.get("order_total_amount", 0) or 0) for o in orders), 2),
-        "shops_count": len(orders_data),
+        "total_orders": non_silver_total_orders,
+        "total_amount": round(non_silver_total_amount, 2),
+        "shops_count": len(non_silver_orders),
     }
 
 
